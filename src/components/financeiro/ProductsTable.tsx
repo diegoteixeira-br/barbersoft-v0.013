@@ -1,4 +1,4 @@
-import { MoreVertical, Pencil, Trash2, Package, AlertTriangle } from "lucide-react";
+import { MoreVertical, Pencil, Trash2, Package, AlertTriangle, Info } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Product } from "@/hooks/useProducts";
 
 interface ProductsTableProps {
@@ -55,6 +56,7 @@ export function ProductsTable({ products, isLoading, onEdit, onDelete, onAdjustS
   }
 
   return (
+    <TooltipProvider>
     <div className="rounded-lg border border-border bg-card overflow-hidden">
       <Table>
         <TableHeader>
@@ -63,8 +65,26 @@ export function ProductsTable({ products, isLoading, onEdit, onDelete, onAdjustS
             <TableHead>SKU</TableHead>
             <TableHead className="text-right">Custo</TableHead>
             <TableHead className="text-right">Venda</TableHead>
-            <TableHead className="text-center">Margem</TableHead>
-            <TableHead className="text-center">Markup</TableHead>
+            <TableHead className="text-center">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center gap-1 cursor-help">Margem <Info className="h-3 w-3 text-muted-foreground" /></span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[250px]">
+                  <p>É o lucro real sobre a venda. Dica: Este é o limite máximo de desconto que você pode dar sem ter prejuízo.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TableHead>
+            <TableHead className="text-center">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center gap-1 cursor-help">Markup <Info className="h-3 w-3 text-muted-foreground" /></span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[250px]">
+                  <p>É quanto você adicionou acima do preço de custo para chegar no preço final.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TableHead>
             <TableHead className="text-center">Estoque</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="w-[50px]"></TableHead>
@@ -166,5 +186,6 @@ export function ProductsTable({ products, isLoading, onEdit, onDelete, onAdjustS
         </TableBody>
       </Table>
     </div>
+    </TooltipProvider>
   );
 }
