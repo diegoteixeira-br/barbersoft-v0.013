@@ -46,6 +46,10 @@ export function AppointmentDetailsModal({
   const [deletionPasswordInput, setDeletionPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState(false);
   const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
+  const [isEditPasswordOpen, setIsEditPasswordOpen] = useState(false);
+  const [editPasswordInput, setEditPasswordInput] = useState("");
+  const [editPasswordError, setEditPasswordError] = useState(false);
+  const [isVerifyingEditPassword, setIsVerifyingEditPassword] = useState(false);
   const [availableCourtesies, setAvailableCourtesies] = useState(0);
   const [isFreeCut, setIsFreeCut] = useState(false);
   const [loyaltyCuts, setLoyaltyCuts] = useState(0);
@@ -315,7 +319,15 @@ export function AppointmentDetailsModal({
               </AlertDialog>
             )}
 
-            <Button variant="outline" size="sm" onClick={onEdit}>
+            <Button variant="outline" size="sm" onClick={() => {
+              if (deletionPasswordRequired && (appointment.status === "confirmed" || appointment.status === "completed")) {
+                setEditPasswordInput("");
+                setEditPasswordError(false);
+                setIsEditPasswordOpen(true);
+              } else {
+                onEdit();
+              }
+            }}>
               <Edit className="h-4 w-4 mr-2" />
               Editar
             </Button>
@@ -437,6 +449,82 @@ export function AppointmentDetailsModal({
               }}
             >
               {isVerifyingPassword ? "Verificando..." : "Confirmar Exclusão"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Password Verification Modal */}
+      <Dialog open={isEditPasswordOpen} onOpenChange={(open) => {
+        setIsEditPasswordOpen(open);
+        if (!open) {
+          setEditPasswordInput("");
+          setEditPasswordError(false);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Verificação de Segurança
+            </DialogTitle>
+            <DialogDescription>
+              Digite a senha para editar este agendamento.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-2">
+            <Label htmlFor="edit-password" className="flex items-center gap-2">
+              <Lock className="h-4 w-4" />
+              Senha de Proteção
+            </Label>
+            <Input
+              id="edit-password"
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              value={editPasswordInput}
+              onChange={(e) => {
+                setEditPasswordInput(e.target.value.replace(/\D/g, ''));
+                setEditPasswordError(false);
+              }}
+              placeholder="Digite a senha numérica"
+              className={editPasswordError ? "border-destructive" : ""}
+            />
+            {editPasswordError && (
+              <p className="text-sm text-destructive">Senha incorreta</p>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditPasswordOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              disabled={!editPasswordInput || isVerifyingEditPassword}
+              onClick={async () => {
+                setIsVerifyingEditPassword(true);
+                const isValid = await verifyDeletionPassword(editPasswordInput);
+                setIsVerifyingEditPassword(false);
+                
+                if (!isValid) {
+                  setEditPasswordError(true);
+                  toast({
+                    title: "Senha incorreta",
+                    description: "A senha de proteção está incorreta.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                
+                setIsEditPasswordOpen(false);
+                setEditPasswordInput("");
+                setEditPasswordError(false);
+                onEdit();
+              }}
+            >
+              {isVerifyingEditPassword ? "Verificando..." : "Confirmar Edição"}
             </Button>
           </DialogFooter>
         </DialogContent>
