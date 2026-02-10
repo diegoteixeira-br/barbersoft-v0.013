@@ -117,25 +117,28 @@ export function CommissionReportTab() {
     };
 
     appointments.forEach((apt) => {
-      const method = (apt.payment_method || "cash") as keyof typeof breakdown;
-      const cardFee = calculateCardFee(apt.total_price, apt.payment_method, debitFeePercent, creditFeePercent);
-      const netValue = calculateNetValue(apt.total_price, apt.payment_method, debitFeePercent, creditFeePercent);
-      const commission = calculateCommissionWithFees(
-        apt.total_price,
-        apt.payment_method,
-        apt.barber?.commission_rate ?? null,
-        debitFeePercent,
-        creditFeePercent,
-        calculationBase
-      );
-      
-      if (breakdown[method]) {
-        breakdown[method].total += apt.total_price;
-        breakdown[method].cardFee += cardFee;
-        breakdown[method].netValue += netValue;
-        breakdown[method].commission += commission;
-        breakdown[method].count += 1;
-      }
+      const distribution = getPaymentDistribution(apt.payment_method, apt.total_price);
+      distribution.forEach(({ method, amount }) => {
+        const key = method as keyof typeof breakdown;
+        const cardFee = calculateCardFee(amount, method, debitFeePercent, creditFeePercent);
+        const netValue = calculateNetValue(amount, method, debitFeePercent, creditFeePercent);
+        const commission = calculateCommissionWithFees(
+          amount,
+          method,
+          apt.barber?.commission_rate ?? null,
+          debitFeePercent,
+          creditFeePercent,
+          calculationBase
+        );
+        
+        if (breakdown[key]) {
+          breakdown[key].total += amount;
+          breakdown[key].cardFee += cardFee;
+          breakdown[key].netValue += netValue;
+          breakdown[key].commission += commission;
+          breakdown[key].count += 1;
+        }
+      });
     });
 
     return breakdown;
