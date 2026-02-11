@@ -548,7 +548,7 @@ export const DemoTourModal = ({ open, onOpenChange }: DemoTourModalProps) => {
       // Check again if aborted
       if (currentAbortController.signal.aborted) return;
       
-      const audioUrl = data.audioUrl;
+      const audioUrl = `${data.audioUrl}?t=${Date.now()}`;
       
       // Cache the URL for this session
       audioCache.current.set(slideIndex, audioUrl);
