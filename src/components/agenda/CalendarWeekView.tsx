@@ -164,6 +164,27 @@ export function CalendarWeekView({
     return Math.max(MIN_SLOT_HEIGHT, calculatedHeight);
   }, [isCompactMode, containerHeight, TIME_SLOTS.length]);
 
+  // Group appointments by day for positioned rendering
+  const appointmentsByDay = useMemo(() => {
+    const map: Record<string, Appointment[]> = {};
+    
+    days.forEach(day => {
+      const dayKey = format(day, "yyyy-MM-dd");
+      map[dayKey] = [];
+    });
+
+    appointments.forEach(apt => {
+      const aptDate = new Date(apt.start_time);
+      const dayKey = format(aptDate, "yyyy-MM-dd");
+      if (map[dayKey]) {
+        map[dayKey].push(apt);
+      }
+    });
+
+    return map;
+  }, [appointments, days]);
+
+  // Keep slot-based map for detecting if a slot has appointments (for lunch break display)
   const appointmentsByDayAndSlot = useMemo(() => {
     const map: Record<string, Record<string, Appointment[]>> = {};
     
@@ -299,6 +320,35 @@ export function CalendarWeekView({
               const dayKey = format(day, "yyyy-MM-dd");
               const isDayToday = isToday(day);
               const isClosed = isOpenOnDate ? !isOpenOnDate(day) : false;
+              const dayAppointments = appointmentsByDay[dayKey] || [];
+              
+              // Calculate overlapping groups for side-by-side rendering
+              const getOverlapGroups = (apts: Appointment[]) => {
+                const sorted = [...apts].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+                const positions: { apt: Appointment; col: number; totalCols: number }[] = [];
+                const columns: { end: number }[] = [];
+                
+                sorted.forEach(apt => {
+                  const start = new Date(apt.start_time).getTime();
+                  const end = new Date(apt.end_time).getTime();
+                  
+                  let col = columns.findIndex(c => c.end <= start);
+                  if (col === -1) {
+                    col = columns.length;
+                    columns.push({ end });
+                  } else {
+                    columns[col].end = end;
+                  }
+                  positions.push({ apt, col, totalCols: 0 });
+                });
+                
+                // Set totalCols for each
+                const totalCols = columns.length;
+                positions.forEach(p => p.totalCols = totalCols);
+                return positions;
+              };
+
+              const positionedEvents = getOverlapGroups(dayAppointments);
               
               return (
                 <div key={day.toISOString()} className={`border-r border-border last:border-r-0 relative ${isClosed ? "bg-muted/30" : ""}`}>
@@ -324,6 +374,7 @@ export function CalendarWeekView({
                     </div>
                   )}
                   
+                  {/* Grid slots (background) */}
                   {TIME_SLOTS.map(slot => {
                     const slotAppointments = appointmentsByDayAndSlot[dayKey]?.[slot.key] || [];
                     const slotDate = setMinutes(setHours(day, slot.hour), slot.minute);
@@ -334,7 +385,7 @@ export function CalendarWeekView({
                     return (
                       <div
                         key={slot.key}
-                        className={`${isHourBoundary ? "border-b border-border" : "border-b border-border/30"} p-0.5 transition-colors ${
+                        className={`${isHourBoundary ? "border-b border-border" : "border-b border-border/30"} transition-colors ${
                           isClosed 
                             ? "bg-muted/40 cursor-not-allowed" 
                             : isLunchBreak
@@ -348,28 +399,86 @@ export function CalendarWeekView({
                         style={{ height: slotHeight }}
                         onClick={() => !isClosed && !isLunchBreak && onSlotClick(slotDate)}
                       >
-                        {isLunchBreak && slotAppointments.length === 0 && !isClosed && slot.minute === 0 ? (
+                        {isLunchBreak && slotAppointments.length === 0 && !isClosed && slot.minute === 0 && (
                           <div className="h-full flex items-center justify-center gap-1 text-orange-600 dark:text-orange-400">
                             <Coffee className="h-3 w-3" />
                             <span className="text-[10px] font-medium">Intervalo</span>
                           </div>
-                        ) : (
-                          <div className={`space-y-0.5 h-full ${
-                            showAllBarbers && slotAppointments.length > 1 
-                              ? "overflow-y-auto" 
-                              : "overflow-hidden"
-                          }`}>
-                            {slotAppointments.map(apt => (
-                              <CalendarEvent
-                                key={apt.id}
-                                appointment={apt}
-                                onClick={() => onAppointmentClick(apt)}
-                                ultraCompact={showAllBarbers}
-                              />
-                            ))}
-                          </div>
                         )}
                       </div>
+                    );
+                  })}
+
+                  {/* Positioned appointment blocks */}
+                  {positionedEvents.map(({ apt, col, totalCols }) => {
+                    const aptStart = new Date(apt.start_time);
+                    const aptEnd = new Date(apt.end_time);
+                    const startMinutes = aptStart.getHours() * 60 + aptStart.getMinutes();
+                    const endMinutes = aptEnd.getHours() * 60 + aptEnd.getMinutes();
+                    const durationMinutes = endMinutes - startMinutes;
+                    
+                    const topOffset = ((startMinutes - firstSlotMinutes) / 15) * slotHeight;
+                    const height = Math.max((durationMinutes / 15) * slotHeight, slotHeight);
+                    const barberColor = apt.barber?.calendar_color || "#FF6B00";
+                    const isCancelled = apt.status === "cancelled";
+                    const isCompleted = apt.status === "completed";
+                    
+                    const widthPercent = 100 / totalCols;
+                    const leftPercent = col * widthPercent;
+                    
+                    const showDetails = height > slotHeight * 1.5;
+
+                    return (
+                      <button
+                        key={apt.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAppointmentClick(apt);
+                        }}
+                        className={`absolute rounded-md overflow-hidden transition-all hover:brightness-110 hover:shadow-lg z-10 text-left ${
+                          isCancelled ? "opacity-50" : ""
+                        }`}
+                        style={{
+                          top: topOffset,
+                          height: height - 2,
+                          left: `${leftPercent + 1}%`,
+                          width: `${widthPercent - 2}%`,
+                          backgroundColor: isCancelled ? "hsl(var(--muted))" : `${barberColor}25`,
+                          borderLeft: `3px solid ${isCancelled ? "hsl(var(--muted-foreground))" : barberColor}`,
+                        }}
+                        title={`${format(aptStart, "HH:mm")} - ${format(aptEnd, "HH:mm")} | ${apt.client_name} | ${apt.service?.name || ''} | ${apt.barber?.name || ''}`}
+                      >
+                        <div className="px-1.5 py-0.5 h-full flex flex-col justify-start overflow-hidden">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className={`text-[11px] font-bold text-foreground ${isCancelled ? "line-through" : ""}`}>
+                              {format(aptStart, "HH:mm")} - {format(aptEnd, "HH:mm")}
+                            </span>
+                            {isCancelled && (
+                              <span className="text-[9px] px-1 rounded bg-muted-foreground/20 text-muted-foreground shrink-0">
+                                Canc.
+                              </span>
+                            )}
+                            {isCompleted && (
+                              <span className="text-[9px] px-1 rounded bg-green-500/20 text-green-600 shrink-0">
+                                ✓
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-xs font-semibold text-foreground truncate ${isCancelled ? "line-through" : ""}`}>
+                            {apt.client_name}
+                          </p>
+                          {showDetails && apt.service && (
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {apt.service.name}
+                            </p>
+                          )}
+                          {showDetails && apt.barber && (
+                            <p className="text-[10px] text-muted-foreground/70 truncate">
+                              {apt.barber.name}
+                            </p>
+                          )}
+                        </div>
+                      </button>
                     );
                   })}
                 </div>
