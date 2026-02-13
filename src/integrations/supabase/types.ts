@@ -1759,6 +1759,13 @@ export type Database = {
         Args: { p_referral_code: string; p_referred_company_id: string }
         Returns: boolean
       }
+      recalculate_all_client_fidelity: {
+        Args: never
+        Returns: {
+          processed_clients: number
+          updated_clients: number
+        }[]
+      }
       user_owns_company: { Args: { p_company_id: string }; Returns: boolean }
       user_owns_unit: { Args: { unit_id: string }; Returns: boolean }
     }
