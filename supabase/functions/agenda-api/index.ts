@@ -1251,7 +1251,17 @@ async function handleCancel(supabase: any, body: any, corsHeaders: any) {
     );
   }
 
-  // Se temos telefone, buscar agendamento com dados completos
+  // Se temos telefone, buscar agendamento com dados completos usando variações de telefone
+  const normalizedCancelPhone = normalizePhoneToStandard(clientPhone);
+  const cancelPhoneVariants = [
+    normalizedCancelPhone,
+    ...getPhoneVariations(normalizedCancelPhone),
+    clientPhone
+  ];
+  const uniqueCancelVariants = [...new Set(cancelPhoneVariants)].filter(Boolean);
+  
+  console.log(`Cancel: searching with phone variants: ${uniqueCancelVariants.join(", ")}`);
+
   let query = supabase
     .from('appointments')
     .select(`
@@ -1260,7 +1270,7 @@ async function handleCancel(supabase: any, body: any, corsHeaders: any) {
       service:services(name)
     `)
     .eq('unit_id', unit_id)
-    .eq('client_phone', clientPhone)
+    .or(uniqueCancelVariants.map(p => `client_phone.eq.${p}`).join(","))
     .in('status', ['pending', 'confirmed']);
 
   // Se data específica foi fornecida, filtrar por ela usando timezone correto
