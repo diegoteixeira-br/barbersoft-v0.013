@@ -117,7 +117,7 @@ export default function Financeiro() {
         onVerify={async (password) => {
           const valid = await verifyDeletionPassword(password);
           if (valid && pendingTab) {
-            setUnlockedTabs((prev) => new Set([...prev, pendingTab]));
+            setUnlockedTabs(new Set(PROTECTED_TABS));
             setActiveTab(pendingTab);
             setPendingTab(null);
           }
