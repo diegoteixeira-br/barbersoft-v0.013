@@ -1,43 +1,45 @@
 
 
-## Corrigir o botao "Cancelar Conexao" do WhatsApp
+# Notificacao de Novo Artigo por Email para Usuarios BarberSoft
 
-### Problema identificado
+## Objetivo
+Quando um novo artigo do blog for publicado pelo admin, enviar automaticamente um email para todos os donos de empresas cadastrados na BarberSoft, notificando sobre o novo conteudo.
 
-Quando o usuario clica em "Cancelar Conexao" durante o processo de conexao (QR Code visivel), acontece o seguinte ciclo:
+## Como vai funcionar
 
-1. O `disconnect()` e chamado, que define o estado como `"disconnected"`
-2. A interface continua mostrando a area de conexao porque a condicao de renderizacao inclui o estado `"disconnected"` (linha 187 do componente)
-3. O efeito `autoConnect` detecta que o estado voltou para `"disconnected"` e cria uma nova instancia automaticamente
-4. Resultado: o modal nunca fecha e fica em loop
+1. O admin cria/salva um novo artigo no painel de blog
+2. Apos salvar, o sistema chama uma Edge Function que busca todos os emails dos usuarios cadastrados (tabela `companies` via `auth.users`)
+3. A Edge Function envia um email bonito via Resend para cada usuario com o titulo, resumo e link do artigo
 
-### Solucao
+## Detalhes Tecnicos
 
-Duas alteracoes serao feitas:
+### 1. Nova Edge Function: `notify-blog-post`
+- Recebe: `post_id` (ou `slug`, `title`, `excerpt`, `image_url`)
+- Valida que o chamador e super admin
+- Busca todos os usuarios com empresa ativa na tabela `companies` (owner_user_id)
+- Usa o service_role_key para listar os emails via `supabase.auth.admin.listUsers()`
+- Envia email via Resend para cada usuario com template HTML estilizado (cores da BarberSoft)
+- Retorna contagem de emails enviados/falhados
 
-**1. `UnitWhatsAppIntegration.tsx` - Usar `cleanup()` e fechar o modal ao cancelar**
+### 2. Integracao no Frontend (AdminBlog.tsx)
+- Apos criar um novo post com sucesso no `handleSave`, chamar `supabase.functions.invoke("notify-blog-post", { body: { ... } })`
+- Adicionar um botao "Notificar Usuarios" na tabela de posts existentes para reenviar manualmente
+- Mostrar toast de sucesso/erro com contagem de emails enviados
 
-- Criar uma nova funcao `handleCancelConnection` que:
-  - Chama `cleanup()` (que deleta a instancia da Evolution API) em vez de `disconnect()` (que e para instancias ja conectadas)
-  - Notifica o componente pai para fechar o modal via um novo callback `onClose`
-- Substituir todas as chamadas de `handleDisconnect` nos botoes "Cancelar Conexao" por `handleCancelConnection`
-- Adicionar `onClose` como prop opcional do componente
+### 3. Template do Email
+- Header com logo BarberSoft
+- Imagem do artigo (se houver)
+- Titulo e resumo
+- Botao "Ler Artigo Completo" linkando para `/blog/{slug}`
+- Footer com link de descadastro (opt-out futuro)
 
-**2. `UnitWhatsAppModal.tsx` - Passar callback de fechamento**
+### 4. Seguranca
+- Apenas super admin pode acionar a funcao
+- Rate limiting natural do Resend (sem spam)
+- Usa `RESEND_API_KEY` ja configurado como secret
 
-- Passar a funcao `onClose` do modal como prop para `UnitWhatsAppIntegration`, permitindo que o componente feche o modal apos o cancelamento
-
-### Detalhes tecnicos
-
-```text
-Fluxo atual (com bug):
-  Cancelar -> disconnect() -> state="disconnected" -> UI mostra loading -> autoConnect recria instancia
-
-Fluxo corrigido:
-  Cancelar -> cleanup() -> state="disconnected" -> onClose() fecha o modal -> autoConnect nao dispara (modal fechado)
-```
-
-Arquivos a modificar:
-- `src/components/units/UnitWhatsAppIntegration.tsx` - Adicionar prop `onClose`, criar `handleCancelConnection`
-- `src/components/units/UnitWhatsAppModal.tsx` - Passar `onClose` para o componente filho
+### Arquivos a criar/modificar
+- **Criar**: `supabase/functions/notify-blog-post/index.ts` - Edge Function de envio
+- **Modificar**: `src/pages/admin/AdminBlog.tsx` - Botao de notificacao e chamada apos criar post
+- **Modificar**: `src/hooks/useBlogPosts.ts` - Callback opcional para notificacao pos-criacao
 
