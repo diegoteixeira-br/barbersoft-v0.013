@@ -10,7 +10,10 @@ import { UpcomingAppointmentsList } from "@/components/dashboard/UpcomingAppoint
 import { FinancialOverviewChart } from "@/components/dashboard/FinancialOverviewChart";
 import { OnboardingCard } from "@/components/dashboard/OnboardingCard";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useBarbers } from "@/hooks/useBarbers";
+import { useServices } from "@/hooks/useServices";
 import { supabase } from "@/integrations/supabase/client";
+import { useCurrentUnit } from "@/contexts/UnitContext";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -21,6 +24,9 @@ export default function Dashboard() {
   });
   const [isEmailConfirmed, setIsEmailConfirmed] = useState(true);
   const { status } = useSubscription();
+  const { currentUnitId } = useCurrentUnit();
+  const { barbers } = useBarbers(currentUnitId);
+  const { services } = useServices(currentUnitId);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -58,7 +64,7 @@ export default function Dashboard() {
         </div>
         {/* Onboarding Card for trial users */}
         {(status?.plan_status === "trial" || !status?.plan_status) && (
-          <OnboardingCard isEmailConfirmed={isEmailConfirmed} planStatus={status?.plan_status || null} />
+          <OnboardingCard isEmailConfirmed={isEmailConfirmed} planStatus={status?.plan_status || null} hasBarbers={(barbers?.length || 0) > 0} hasServices={(services?.length || 0) > 0} />
         )}
 
         {/* Metrics Grid */}

@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle, Circle, X, Mail, CreditCard, Settings } from "lucide-react";
+import { CheckCircle, Circle, X, Mail, CreditCard, Settings, Users, Scissors } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 interface OnboardingCardProps {
   isEmailConfirmed: boolean;
   planStatus: string | null;
+  hasBarbers: boolean;
+  hasServices: boolean;
 }
 
-export function OnboardingCard({ isEmailConfirmed, planStatus }: OnboardingCardProps) {
+export function OnboardingCard({ isEmailConfirmed, planStatus, hasBarbers, hasServices }: OnboardingCardProps) {
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState(() => {
     return localStorage.getItem("barbersoft_onboarding_dismissed") === "true";
@@ -35,8 +37,22 @@ export function OnboardingCard({ isEmailConfirmed, planStatus }: OnboardingCardP
       action: () => navigate("/assinatura"),
     },
     {
+      label: "Cadastrar profissionais",
+      description: "Adicione sua equipe",
+      done: hasBarbers,
+      icon: Users,
+      action: () => navigate("/profissionais"),
+    },
+    {
+      label: "Cadastrar serviços",
+      description: "Defina cortes, barba e mais",
+      done: hasServices,
+      icon: Scissors,
+      action: () => navigate("/servicos"),
+    },
+    {
       label: "Configurar sua barbearia",
-      description: "Horários, serviços e profissionais",
+      description: "Horários e preferências",
       done: false,
       icon: Settings,
       action: () => navigate("/configuracoes"),
